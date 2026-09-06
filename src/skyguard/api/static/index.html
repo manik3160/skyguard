@@ -9,6 +9,11 @@
    SkyGuard console. Light, card-based, dependency-free so it runs on a
    venue laptop with no network. Green reads "trustworthy", amber
    "watch", coral "fault". Each channel keeps its instrument's colour.
+
+   The sidebar switches between real views (dashboard / alerts / layers
+   / inject / reports). Only the active view is in the layout; the
+   station roster is a persistent right-hand column, because picking a
+   station is meaningful on every view.
    ------------------------------------------------------------------ */
 :root{
   --bg:#f3f4f1;
@@ -34,6 +39,7 @@
   font-synthesis:none;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{
   margin:0;background:var(--bg);color:var(--ink);min-height:100vh;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,system-ui,sans-serif;
@@ -51,6 +57,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .side{
   padding:22px 16px;display:flex;flex-direction:column;gap:26px;
   border-right:1px solid var(--line);background:var(--bg);
+  position:sticky;top:0;height:100vh;
 }
 .brand{display:flex;align-items:center;gap:9px;padding:0 8px;font-weight:650;
   font-size:16px;letter-spacing:-.02em}
@@ -60,7 +67,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .nav{display:flex;flex-direction:column;gap:2px}
 .nav a{
   display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--radius-sm);
-  color:var(--ink-2);text-decoration:none;font-weight:500;
+  color:var(--ink-2);text-decoration:none;font-weight:500;cursor:pointer;
 }
 .nav a svg{width:17px;height:17px;flex:none;stroke-width:1.8}
 .nav a:hover{background:#eceee9;color:var(--ink)}
@@ -70,7 +77,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .side .tag{padding:0 8px;font-size:11px;font-weight:600;letter-spacing:.06em;
   text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
 
-/* main --------------------------------------------------------- */
+/* main ---------------------------------------------------------- */
 .main{padding:20px 24px 32px;min-width:0}
 .top{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
 .top h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.02em}
@@ -87,9 +94,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .dot.wait{background:var(--amber);animation:pulse 1.4s infinite}
 @keyframes pulse{50%{opacity:.35}}
 
-/* card grid --------------------------------------------------- */
-.grid{display:grid;grid-template-columns:1fr 360px;gap:16px;align-items:start}
-.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+/* workspace: active view + persistent roster -------------------- */
+.workspace{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+.view{display:flex;flex-direction:column;gap:16px;min-width:0}
+.rail{display:flex;flex-direction:column;gap:16px;min-width:0}
 .card{
   background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
   padding:18px;box-shadow:var(--shadow)
@@ -105,7 +113,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 .badge.watch{background:var(--amber-soft);color:#b9791f}
 .badge.bad{background:var(--coral-soft);color:#c14d3f}
 
-/* hero readouts + charts ------------------------------------- */
+/* summary strip ------------------------------------------------- */
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.strip .s1{border:1px solid var(--line-soft);border-radius:var(--radius-sm);
+  padding:12px 13px;background:#fcfcfb}
+.strip .s1 .k{font-size:11.5px;color:var(--ink-3)}
+.strip .s1 .v{font-size:22px;font-weight:650;letter-spacing:-.02em;margin-top:3px}
+
+/* hero readouts + charts -------------------------------------- */
 .reads{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:6px}
 .read{border:1px solid var(--line-soft);border-radius:var(--radius-sm);padding:12px 13px;background:#fcfcfb}
 .read .k{font-size:11.5px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
@@ -118,7 +133,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .trace .lane{display:flex;align-items:center;gap:10px;padding:4px 0}
 .trace .lane .nm{width:52px;font-size:11.5px;color:var(--ink-3)}
 .trace canvas{flex:1;height:52px;display:block}
-.legend{display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--ink-3)}
+.legend{display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--ink-3);flex-wrap:wrap}
 .legend span{display:flex;align-items:center;gap:6px}
 .legend i{width:14px;height:0;border-top:2px solid currentColor;display:block}
 .legend i.dash{border-top-style:dashed}
@@ -164,8 +179,8 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
 .hint{font-size:11.5px;color:var(--ink-3);margin-top:10px}
 
 /* detection layers -------------------------------------------- */
-.layers{display:flex;gap:8px}
-.layer{flex:1;border:1px solid var(--line-soft);border-radius:var(--radius-sm);
+.layers{display:flex;gap:8px;flex-wrap:wrap}
+.layer{flex:1;min-width:120px;border:1px solid var(--line-soft);border-radius:var(--radius-sm);
   padding:10px;background:#fcfcfb;text-align:center}
 .layer .lb{font-size:11px;font-weight:650}
 .layer .ds{font-size:10px;color:var(--ink-3);margin-top:2px;min-height:24px}
@@ -173,6 +188,12 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
 .layer .mtr i{display:block;height:100%;width:0;background:var(--green);transition:width .4s ease}
 .layer.hit{border-color:var(--green);background:var(--green-soft)}
 .layer.hit .mtr i{background:var(--green)}
+.ltable{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.ltable .lr{display:grid;grid-template-columns:92px 1fr 58px;gap:10px;align-items:start;
+  font-size:12px;padding:9px 0;border-top:1px solid var(--line-soft)}
+.ltable .lr b{font-weight:650}
+.ltable .lr .w{text-align:right;color:var(--ink-3);font-weight:600}
+.ltable .lr span{color:var(--ink-2)}
 
 /* gauge --------------------------------------------------- */
 .gauge{display:flex;flex-direction:column;align-items:center;padding-top:4px}
@@ -214,13 +235,23 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
 
 .empty{padding:22px 4px;text-align:center;font-size:12.5px;color:var(--ink-3)}
 
+.perf{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.perf .p1 .s{font-size:11.5px}
+.perf .p1 .v{font-size:20px;font-weight:650}
+.perf .p1 .n{font-size:10.5px;color:var(--ink-3)}
+
 @media (max-width:1180px){
-  .grid{grid-template-columns:1fr}
+  .workspace{grid-template-columns:1fr}
   .app{grid-template-columns:200px 1fr}
 }
 @media (max-width:720px){
-  .app{grid-template-columns:1fr}.side{display:none}
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;gap:12px;align-items:center}
+  .side .grow{display:none}
+  .nav{flex-direction:row;flex-wrap:wrap}
+  .nav .divide{display:none}
   .row2{grid-template-columns:1fr}.reads{grid-template-columns:1fr 1fr}
+  .strip{grid-template-columns:1fr 1fr}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -232,20 +263,20 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
     <div class="brand"><span class="mark"></span>SkyGuard</div>
     <div>
       <div class="tag">Console</div>
-      <div class="nav">
-        <a class="on" data-scroll="hero" href="#hero">
+      <div class="nav" id="nav">
+        <a class="on" data-view="dashboard">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
           Dashboard</a>
-        <a data-scroll="net" href="#net">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M12 7.5 6.5 15.5M12 7.5l5.5 8"/></svg>
-          Network</a>
-        <a data-scroll="log" href="#log">
+        <a data-view="alerts">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3 3 20h18L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg>
           Alerts</a>
-        <a data-scroll="layers" href="#layers">
+        <a data-view="layers">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13l9 5 9-5M3 18l9 5 9-5"/></svg>
           Detection layers</a>
-        <a data-scroll="hero" href="#hero">
+        <a data-view="inject">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>
+          Inject a fault</a>
+        <a data-view="reports">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg>
           Reports</a>
       </div>
@@ -253,17 +284,17 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
     <div class="grow"></div>
     <div class="nav">
       <div class="divide"></div>
-      <a href="#hero">
+      <a data-view="reports">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22a10 10 0 1 0-10-10v3a3 3 0 0 0 3 3h1v-6H4"/><path d="M20 12v3a3 3 0 0 1-3 3h-1v-6h4"/></svg>
-        Support</a>
+        About &amp; limits</a>
     </div>
   </nav>
 
   <div class="main">
     <div class="top">
       <div>
-        <h1>Network overview</h1>
-        <p>Automatic Weather Station quality control · IMD Haryana &amp; Himachal</p>
+        <h1 id="top-title">Network overview</h1>
+        <p id="top-sub">Automatic Weather Station quality control · IMD Haryana &amp; Himachal</p>
       </div>
       <div class="spacer"></div>
       <span class="chip live" id="link"><span class="dot wait" id="link-dot"></span><span id="link-text">connecting</span></span>
@@ -271,49 +302,112 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
       <span class="chip">caught <b id="stat-alerts">0</b></span>
     </div>
 
-    <div class="grid">
-      <div class="col">
+    <div class="workspace">
+      <div style="min-width:0">
 
-        <!-- HERO: station monitor -->
-        <section class="card" id="hero">
-          <div class="hd">
-            <div>
-              <div class="t" id="hero-name">—</div>
-              <div class="s mono" id="hero-id">—</div>
+        <!-- VIEW: DASHBOARD ------------------------------------ -->
+        <div class="view" data-view="dashboard">
+          <section class="card">
+            <div class="hd"><div><div class="t">Network status</div>
+              <div class="s">Every station, right now</div></div></div>
+            <div class="strip" id="strip">
+              <div class="s1"><div class="k">Stations</div><div class="v mono" id="sum-stations">—</div></div>
+              <div class="s1"><div class="k">Flagged now</div><div class="v mono" id="sum-flagged">—</div></div>
+              <div class="s1"><div class="k">Observations</div><div class="v mono" id="sum-obs">—</div></div>
+              <div class="s1"><div class="k">Alert episodes</div><div class="v mono" id="sum-eps">—</div></div>
             </div>
-            <span class="badge ok" id="hero-badge">Nominal</span>
-          </div>
-          <div class="reads" id="reads">
-            <div class="read" data-channel="temperature">
-              <span class="k"><i style="background:var(--temp)"></i>Temperature</span>
-              <span class="v mono" data-value>—<u>°C</u></span>
-            </div>
-            <div class="read" data-channel="pressure">
-              <span class="k"><i style="background:var(--pres)"></i>Pressure</span>
-              <span class="v mono" data-value>—<u>hPa</u></span>
-            </div>
-            <div class="read" data-channel="humidity">
-              <span class="k"><i style="background:var(--humi)"></i>Humidity</span>
-              <span class="v mono" data-value>—<u>%</u></span>
-            </div>
-          </div>
-          <div class="trace">
-            <div class="lane"><span class="nm">Temp</span><canvas data-channel="temperature"></canvas></div>
-            <div class="lane"><span class="nm">Pressure</span><canvas data-channel="pressure"></canvas></div>
-            <div class="lane"><span class="nm">Humidity</span><canvas data-channel="humidity"></canvas></div>
-          </div>
-          <div class="legend">
-            <span style="color:var(--ink-2)"><i></i>measured</span>
-            <span style="color:var(--ink-2)"><i class="dash"></i>repaired estimate</span>
-            <span><i class="band"></i>flagged sample</span>
-          </div>
-        </section>
+          </section>
 
-        <div class="row2">
-          <!-- INJECT -->
+          <section class="card">
+            <div class="hd">
+              <div>
+                <div class="t" id="hero-name">—</div>
+                <div class="s mono" id="hero-id">—</div>
+              </div>
+              <span class="badge ok" id="hero-badge">Nominal</span>
+            </div>
+            <div class="reads" id="reads">
+              <div class="read" data-channel="temperature">
+                <span class="k"><i style="background:var(--temp)"></i>Temperature</span>
+                <span class="v mono" data-value>—<u>°C</u></span>
+              </div>
+              <div class="read" data-channel="pressure">
+                <span class="k"><i style="background:var(--pres)"></i>Pressure</span>
+                <span class="v mono" data-value>—<u>hPa</u></span>
+              </div>
+              <div class="read" data-channel="humidity">
+                <span class="k"><i style="background:var(--humi)"></i>Humidity</span>
+                <span class="v mono" data-value>—<u>%</u></span>
+              </div>
+            </div>
+            <div class="trace">
+              <div class="lane"><span class="nm">Temp</span><canvas data-channel="temperature"></canvas></div>
+              <div class="lane"><span class="nm">Pressure</span><canvas data-channel="pressure"></canvas></div>
+              <div class="lane"><span class="nm">Humidity</span><canvas data-channel="humidity"></canvas></div>
+            </div>
+            <div class="legend">
+              <span style="color:var(--ink-2)"><i></i>measured</span>
+              <span style="color:var(--ink-2)"><i class="dash"></i>repaired estimate</span>
+              <span><i class="band"></i>flagged sample</span>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="hd"><div><div class="t">Station health</div>
+              <div class="s" id="gauge-name">—</div></div></div>
+            <div class="gauge">
+              <svg viewBox="0 0 180 100">
+                <path d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--line)" stroke-width="14" stroke-linecap="round"/>
+                <path id="gauge-arc" d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--green)" stroke-width="14" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264" style="transition:stroke-dashoffset .5s ease,stroke .3s"/>
+              </svg>
+              <div class="num mono" id="gauge-num">—</div>
+              <div class="cap">health index · quarantine below 40</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- VIEW: ALERTS -------------------------------------- -->
+        <div class="view" data-view="alerts" hidden>
+          <section class="card">
+            <div class="hd"><div><div class="t">Alert log</div>
+              <div class="s">Injected faults, grouped into episodes · newest first</div></div></div>
+            <div class="log" id="alerts"><p class="empty">No alerts yet — inject a fault to see the detector react.</p></div>
+          </section>
+
+          <section class="card detail" data-view="alerts">
+            <div class="hd"><div><div class="t">Why it fired</div>
+              <div class="s">Plain-language explanation</div></div></div>
+            <div id="detail-body"><p class="empty" style="padding:14px 0">Select an alert to see which layer caught it and what to do.</p></div>
+          </section>
+        </div>
+
+        <!-- VIEW: DETECTION LAYERS --------------------------- -->
+        <div class="view" data-view="layers" hidden>
+          <section class="card">
+            <div class="hd"><div><div class="t">Detection layers</div>
+              <div class="s" id="layers-sub">Five checks, ordered by how easily weather fools them</div></div></div>
+            <div class="layers">
+              <div class="layer" data-layer="l0_physics"><div class="lb">L0 physics</div><div class="ds">Range · slew · dewpoint</div><div class="mtr"><i></i></div></div>
+              <div class="layer" data-layer="l1_temporal"><div class="lb">L1 temporal</div><div class="ds">Spikes · steps · freezes</div><div class="mtr"><i></i></div></div>
+              <div class="layer" data-layer="l2_multivariate"><div class="lb">L2 joint</div><div class="ds">Cross-channel impossible</div><div class="mtr"><i></i></div></div>
+              <div class="layer" data-layer="l3_sequence"><div class="lb">L3 sequence</div><div class="ds">Drift · noise bursts</div><div class="mtr"><i></i></div></div>
+              <div class="layer" data-layer="l4_spatial"><div class="lb">L4 spatial</div><div class="ds">Buddy check vs neighbours</div><div class="mtr"><i></i></div></div>
+            </div>
+            <div class="ltable">
+              <div class="lr"><b>L0 physics</b><span>Range, slew rate, dewpoint ≤ temperature. Catches the impossible; weather never fools it.</span><span class="w">1.00</span></div>
+              <div class="lr"><b>L1 temporal</b><span>Hampel on the forecast residual plus a stuck test. Catches spikes, steps, frozen sensors.</span><span class="w">0.85</span></div>
+              <div class="lr"><b>L2 joint</b><span>Robust Mahalanobis + Isolation Forest. Catches readings that are individually plausible but jointly impossible.</span><span class="w">0.75</span></div>
+              <div class="lr"><b>L3 sequence</b><span>PCA subspace reconstruction. Catches drift and noise bursts; most fooled by real weather.</span><span class="w">0.70</span></div>
+              <div class="lr"><b>L4 spatial</b><span>WMO buddy check against neighbours. Catches sustained bias a single station can't see in itself.</span><span class="w">0.90</span></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- VIEW: INJECT ------------------------------------- -->
+        <div class="view" data-view="inject" hidden>
           <section class="card">
             <div class="hd"><div><div class="t">Inject a fault</div>
-              <div class="s">Test the detector live</div></div></div>
+              <div class="s">Test the detector live on <b id="inject-station">the selected station</b></div></div></div>
             <div class="field">
               <label for="in-channel">Channel</label>
               <select id="in-channel">
@@ -339,79 +433,53 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
               <button class="btn go" id="in-go">Inject fault</button>
               <button class="btn" id="in-clear">Clear</button>
             </div>
-            <div class="hint">Runs on the selected station until you press Clear.</div>
-          </section>
-
-          <!-- GAUGE -->
-          <section class="card">
-            <div class="hd"><div><div class="t">Station health</div>
-              <div class="s" id="gauge-name">—</div></div></div>
-            <div class="gauge">
-              <svg viewBox="0 0 180 100">
-                <path d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--line)" stroke-width="14" stroke-linecap="round"/>
-                <path id="gauge-arc" d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--green)" stroke-width="14" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264" style="transition:stroke-dashoffset .5s ease,stroke .3s"/>
-              </svg>
-              <div class="num mono" id="gauge-num">—</div>
-              <div class="cap">health index · quarantine below 40</div>
-            </div>
+            <div class="hint">Runs on the selected station until you press Clear. Open <b>Alerts</b> to watch the detector react.</div>
           </section>
         </div>
 
-        <!-- DETECTION LAYERS -->
-        <section class="card" id="layers">
-          <div class="hd"><div><div class="t">Detection layers</div>
-            <div class="s" id="layers-sub">Five checks, ordered by how easily weather fools them</div></div></div>
-          <div class="layers">
-            <div class="layer" data-layer="l0_physics"><div class="lb">L0 physics</div><div class="ds">Range · slew · dewpoint</div><div class="mtr"><i></i></div></div>
-            <div class="layer" data-layer="l1_temporal"><div class="lb">L1 temporal</div><div class="ds">Spikes · steps · freezes</div><div class="mtr"><i></i></div></div>
-            <div class="layer" data-layer="l2_multivariate"><div class="lb">L2 joint</div><div class="ds">Cross-channel impossible</div><div class="mtr"><i></i></div></div>
-            <div class="layer" data-layer="l3_sequence"><div class="lb">L3 sequence</div><div class="ds">Drift · noise bursts</div><div class="mtr"><i></i></div></div>
-            <div class="layer" data-layer="l4_spatial"><div class="lb">L4 spatial</div><div class="ds">Buddy check vs neighbours</div><div class="mtr"><i></i></div></div>
-          </div>
-        </section>
+        <!-- VIEW: REPORTS ----------------------------------- -->
+        <div class="view" data-view="reports" hidden>
+          <section class="card">
+            <div class="hd"><div><div class="t">Pipeline</div>
+              <div class="s">Single-threaded Python, whole network on one core</div></div></div>
+            <div class="perf">
+              <div class="p1"><div class="s" style="color:var(--ink-3)">Latency / observation</div>
+                <div class="mono v">~4 ms</div>
+                <div class="n">benchmark, laptop core</div></div>
+              <div class="p1"><div class="s" style="color:var(--ink-3)">Throughput</div>
+                <div class="mono v">~300 /s</div>
+                <div class="n">benchmark, laptop core</div></div>
+            </div>
+            <div class="hint" id="pipe-note">
+              This instance is a free shared box — it currently measures
+              <b id="stat-latency">—</b> / <b id="stat-throughput">—</b>, well below a
+              normal core. On the clean stream the detector flags
+              <b id="stat-spont">—</b> of observations on its own (a known limit,
+              <code>CLAUDE.md</code> §8).
+            </div>
+          </section>
 
-        <!-- ALERT LOG -->
-        <section class="card" id="log">
-          <div class="hd"><div><div class="t">Alert log</div>
-            <div class="s">Injected faults, grouped into episodes · newest first</div></div></div>
-          <div class="log" id="alerts"><p class="empty">No alerts yet — inject a fault to see the detector react.</p></div>
-        </section>
+          <section class="card">
+            <div class="hd"><div><div class="t">Measured state</div>
+              <div class="s">Reproduce with <code>make bench</code> / <code>make calibrate</code></div></div></div>
+            <div class="ltable" style="margin-top:0">
+              <div class="lr" style="border-top:0"><b>Clean FPR</b><span>Clean-stream false-positive rate, single station.</span><span class="w">0.022</span></div>
+              <div class="lr"><b>Point F1</b><span>Point-level F1 on injected faults, network, all layers.</span><span class="w">0.567</span></div>
+              <div class="lr"><b>Event recall</b><span>Event-level recall across the seven fault types the injector places.</span><span class="w">1.000</span></div>
+              <div class="lr"><b>Latency</b><span>p50 / p99 on a laptop core, ~300 observations per second.</span><span class="w">5 / 8 ms</span></div>
+            </div>
+            <p class="hint">Event recall is excellent; point recall is mediocre and precision needs work. The system reliably notices every fault when it starts and partially loses long ones. That is the honest characterisation.</p>
+          </section>
+        </div>
+
       </div>
 
-      <div class="col">
-        <!-- NETWORK ROSTER -->
-        <section class="card" id="net">
-          <div class="hd"><div><div class="t">Network</div>
-            <div class="s">4 stations · pick one to inspect</div></div></div>
-          <div class="stations" id="roster"></div>
-        </section>
-
-        <!-- ALERT DETAIL -->
-        <section class="card detail" id="detail">
-          <div class="hd"><div><div class="t">Why it fired</div>
-            <div class="s">Plain-language explanation</div></div></div>
-          <div id="detail-body"><p class="empty" style="padding:14px 0">Select an alert to see which layer caught it and what to do.</p></div>
-        </section>
-
-        <!-- PIPELINE -->
+      <!-- PERSISTENT RAIL: station roster --------------------- -->
+      <div class="rail">
         <section class="card">
-          <div class="hd"><div><div class="t">Pipeline</div>
-            <div class="s">Single-threaded Python, whole network on one core</div></div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div><div class="s" style="font-size:11.5px">Latency / observation</div>
-              <div class="mono" style="font-size:20px;font-weight:650">~4 ms</div>
-              <div class="s" style="font-size:10.5px">benchmark, laptop core</div></div>
-            <div><div class="s" style="font-size:11.5px">Throughput</div>
-              <div class="mono" style="font-size:20px;font-weight:650">~300 /s</div>
-              <div class="s" style="font-size:10.5px">benchmark, laptop core</div></div>
-          </div>
-          <div class="hint" id="pipe-note">
-            This instance is a free shared box — it currently measures
-            <b id="stat-latency">—</b> / <b id="stat-throughput">—</b>, well below a
-            normal core. On the clean stream the detector flags
-            <b id="stat-spont">—</b> of observations on its own (a known limit,
-            <code>CLAUDE.md</code> §8).
-          </div>
+          <div class="hd"><div><div class="t">Network</div>
+            <div class="s" id="roster-sub">stations · pick one to inspect</div></div></div>
+          <div class="stations" id="roster"></div>
         </section>
       </div>
     </div>
@@ -426,10 +494,22 @@ const CH_VAR = {temperature:"--temp", pressure:"--pres", humidity:"--humi"};
 const AV = {temperature:"#e07a44", pressure:"#5b8fb0", humidity:"#3fa07a"};
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fmt = v => (v === null || v === undefined) ? "—" : v.toFixed(1);
+// Every /api body is a live snapshot; a cached one resurrects state the
+// operator has already cleared. Always bypass the browser cache.
+const getJSON = u => fetch(u, {cache: "no-store"}).then(r => r.json());
+
+const VIEWS = {
+  dashboard: ["Network overview", "Automatic Weather Station quality control · IMD Haryana & Himachal"],
+  alerts:    ["Alerts", "Faults the detector has caught, grouped into episodes"],
+  layers:    ["Detection layers", "Five checks, ordered by how easily real weather fools them"],
+  inject:    ["Inject a fault", "Arm a named fault on the selected station and watch the pipeline react"],
+  reports:   ["Reports", "Measured performance and known limits"],
+};
 
 const state = {
   stations: [],
   selected: null,
+  view: "dashboard",
   history: {},        // station_id -> [verdict payload]
   alerts: [],
   focused: null,      // alert shown in the detail card
@@ -508,15 +588,39 @@ function drawTrace(canvas, channel, rows){
 function healthTone(v){ return v >= 70 ? "ok" : v >= 40 ? "watch" : "bad"; }
 function healthCls(v){ return v >= 70 ? "" : v >= 40 ? "watch" : "bad"; }
 
+function latestFor(id){
+  const rows = state.history[id] || [];
+  return rows[rows.length - 1] || null;
+}
+function healthOf(id){
+  const latest = latestFor(id);
+  const s = state.stations.find(x => x.station_id === id);
+  return (latest && latest.health ? latest.health.station
+    : (s && s.health ? s.health.station : null));
+}
+
+function renderSummary(){
+  const flagged = state.stations.filter(s => {
+    const l = latestFor(s.station_id);
+    return l && l.is_anomalous;
+  }).length;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set("sum-stations", state.stations.length || "—");
+  set("sum-flagged", flagged);
+  set("sum-obs", state.count.toLocaleString());
+  set("sum-eps", episodes().length);
+}
+
 function renderHero(){
   const rows = state.history[state.selected] || [];
   const latest = rows[rows.length - 1];
   const s = state.stations.find(x => x.station_id === state.selected);
   document.getElementById("hero-name").textContent = s ? s.name : "—";
   document.getElementById("hero-id").textContent = state.selected || "—";
+  const injLabel = document.getElementById("inject-station");
+  if (injLabel) injLabel.textContent = s ? s.name : "the selected station";
 
-  const health = latest && latest.health ? latest.health.station
-    : (s && s.health ? s.health.station : null);
+  const health = healthOf(state.selected);
   const flagged = latest && latest.is_anomalous ? latest : null;
   const badge = document.getElementById("hero-badge");
   if (flagged){
@@ -537,7 +641,7 @@ function renderHero(){
       `<u>${ch === "temperature" ? "°C" : ch === "pressure" ? "hPa" : "%"}</u>`;
     el.classList.toggle("flag", !!(latest && latest.flagged && latest.flagged.includes(ch)));
   });
-  document.querySelectorAll("#hero canvas").forEach(c =>
+  document.querySelectorAll('.view[data-view="dashboard"] canvas').forEach(c =>
     drawTrace(c, c.dataset.channel, rows));
 
   // gauge
@@ -552,18 +656,18 @@ function renderHero(){
 function renderRoster(){
   const host = document.getElementById("roster");
   host.innerHTML = "";
+  document.getElementById("roster-sub").textContent =
+    `${state.stations.length} stations · pick one to inspect`;
   state.stations.forEach(s => {
-    const rows = state.history[s.station_id] || [];
-    const latest = rows[rows.length - 1];
-    const health = latest && latest.health ? latest.health.station
-      : (s.health ? s.health.station : null);
+    const latest = latestFor(s.station_id);
+    const health = healthOf(s.station_id);
     const rd = latest ? latest.observation : {};
     const hv = health ?? 100;
     const init = s.name.slice(0, 2).toUpperCase();
     const b = document.createElement("button");
     b.className = "st" + (s.station_id === state.selected ? " on" : "");
     b.innerHTML = `
-      <span class="av" style="background:${AV[CHANNELS[0]] && "#3a4036"};background:linear-gradient(150deg,#3a4036,#5c6360)">${init}</span>
+      <span class="av" style="background:linear-gradient(150deg,#3a4036,#5c6360)">${init}</span>
       <span>
         <span class="nm">${s.name}</span>
         <span class="rd mono">${fmt(rd.temperature)}° · ${fmt(rd.pressure)} hPa · ${fmt(rd.humidity)}%</span>
@@ -589,7 +693,8 @@ function renderLayers(){
     el.classList.toggle("hit", sc > 0.01);
     el.querySelector(".mtr i").style.width = Math.round(Math.min(sc, 1) * 100) + "%";
   });
-  document.getElementById("layers-sub").textContent = a
+  const sub = document.getElementById("layers-sub");
+  if (sub) sub.textContent = a
     ? `Contributions to: ${a.fault_label} at ${a.station_id}`
     : "Five checks, ordered by how easily weather fools them";
 }
@@ -599,10 +704,7 @@ function relTime(ts){
   return d.toISOString().slice(11, 16) + "Z";
 }
 
-/* Collapse a run of alerts on the same station+channels into one episode row.
-   A sustained fault fires every sample; grouping on channels (not the fault
-   label) keeps it a single row even when the root-cause classifier disagrees
-   with itself on the odd sample. */
+/* Collapse a run of alerts on the same station+channels into one episode row. */
 function episodes(){
   const out = [];
   for (const a of state.alerts){
@@ -666,6 +768,29 @@ function renderDetail(){
     ${repaired ? `<div class="fix">Corrected estimate: <span class="mono">${repaired}</span></div>` : ""}`;
 }
 
+function renderAll(){
+  renderHero(); renderRoster(); renderAlerts(); renderDetail();
+  renderLayers(); renderSummary();
+}
+
+/* ---- routing: real views, no scrolling ----------------------- */
+function setView(name){
+  if (!VIEWS[name]) name = "dashboard";
+  state.view = name;
+  document.querySelectorAll(".view").forEach(v => { v.hidden = v.dataset.view !== name; });
+  document.querySelectorAll("#nav a, .side .nav a").forEach(a =>
+    a.classList.toggle("on", a.dataset.view === name));
+  document.getElementById("top-title").textContent = VIEWS[name][0];
+  document.getElementById("top-sub").textContent = VIEWS[name][1];
+  if (location.hash.slice(1) !== name) history.replaceState(null, "", "#" + name);
+  renderAll();
+}
+
+document.querySelectorAll(".side .nav a[data-view]").forEach(a => {
+  a.addEventListener("click", e => { e.preventDefault(); setView(a.dataset.view); });
+});
+window.addEventListener("hashchange", () => setView(location.hash.slice(1)));
+
 /* ---- transport ---------------------------------------------- */
 let lastWs = 0;
 
@@ -690,7 +815,6 @@ function link(){
         state.alerts.unshift(row);
         if (state.alerts.length > 40) state.alerts.pop();
         state.focused = row;
-        renderAlerts(); renderDetail(); renderLayers();
       }
       document.getElementById("stat-count").textContent = state.count.toLocaleString();
       document.getElementById("stat-alerts").textContent = episodes().length;
@@ -699,26 +823,38 @@ function link(){
   };
 }
 
-let pending = false;
+/* Coalesce paints and cap them at ~2 Hz. The stream itself is slowed
+   server-side (SKYGUARD_SPEED default 3); this keeps a burst of catch-up
+   messages after a reconnect from stuttering the charts. */
+let pending = false, lastPaint = 0;
 function schedule(){
-  if (pending) return; pending = true;
-  requestAnimationFrame(() => { pending = false; renderHero(); renderRoster(); });
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    const now = performance.now();
+    const wait = 500 - (now - lastPaint);
+    if (wait > 0){ setTimeout(schedule, wait); return; }
+    lastPaint = now;
+    renderAll();
+  });
 }
 
 async function boot(){
-  const stations = await (await fetch("/api/stations")).json();
+  const stations = await getJSON("/api/stations");
   state.stations = stations;
   state.selected = stations[0].station_id;
   for (const s of stations)
-    state.history[s.station_id] = await (await fetch(`/api/history/${s.station_id}`)).json();
-  state.alerts = await (await fetch("/api/alerts")).json();
+    state.history[s.station_id] = await getJSON(`/api/history/${s.station_id}`);
+  state.alerts = await getJSON("/api/alerts");
   if (state.alerts.length) state.focused = state.alerts[0];
-  renderHero(); renderRoster(); renderAlerts(); renderDetail(); renderLayers();
+
+  setView(location.hash.slice(1) || "dashboard");
   link();
 
   setInterval(async () => {
     try {
-      const p = await (await fetch("/api/performance")).json();
+      const p = await getJSON("/api/performance");
       document.getElementById("stat-latency").textContent = p.mean_latency_ms.toFixed(1) + " ms";
       document.getElementById("stat-throughput").textContent =
         Math.round(p.throughput_per_second).toLocaleString() + " obs/s";
@@ -727,23 +863,23 @@ async function boot(){
         document.getElementById("stat-spont").textContent = rate.toFixed(1) + " %";
       }
     } catch (e) { /* transient */ }
-  }, 2000);
+  }, 3000);
 
   // Fallback: if the WebSocket is blocked (some venue proxies drop it), keep the
-  // console alive by polling. Cheap -- four small JSON bodies every 3 s.
+  // console alive by polling. Cheap -- four small JSON bodies every 4 s.
   setInterval(async () => {
-    if (Date.now() - lastWs < 4000) return;
+    if (Date.now() - lastWs < 5000) return;
     try {
       for (const s of state.stations)
-        state.history[s.station_id] = await (await fetch(`/api/history/${s.station_id}`)).json();
+        state.history[s.station_id] = await getJSON(`/api/history/${s.station_id}`);
       const before = state.alerts.length;
-      state.alerts = await (await fetch("/api/alerts")).json();
+      state.alerts = await getJSON("/api/alerts");
       if (state.alerts.length && (!state.focused || state.alerts.length !== before))
         state.focused = state.alerts[0];
-      renderHero(); renderRoster(); renderAlerts(); renderDetail(); renderLayers();
+      renderAll();
       document.getElementById("stat-alerts").textContent = episodes().length;
     } catch (e) { /* transient */ }
-  }, 3000);
+  }, 4000);
 }
 
 document.getElementById("in-go").onclick = () => fetch("/api/inject", {
@@ -760,15 +896,8 @@ document.getElementById("in-clear").onclick = async () => {
     method: "POST", headers: {"Content-Type": "application/json"}, body: "{}",
   });
   state.alerts = []; state.focused = null;
-  renderAlerts(); renderDetail(); renderLayers();
+  renderAll();
 };
-
-document.querySelectorAll(".nav a[data-scroll]").forEach(a => {
-  a.onclick = e => {
-    document.querySelectorAll(".nav a").forEach(x => x.classList.remove("on"));
-    a.classList.add("on");
-  };
-});
 
 window.addEventListener("resize", schedule);
 boot();

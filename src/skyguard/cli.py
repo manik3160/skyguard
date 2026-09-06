@@ -4,7 +4,7 @@
     python -m skyguard.cli calibrate
     python -m skyguard.cli spatial-calibrate [--quick]
     python -m skyguard.cli ablation
-    python -m skyguard.cli serve [--port 8000] [--speed 12]
+    python -m skyguard.cli serve [--port 8000] [--speed 2]
     python -m skyguard.cli demo
 """
 
@@ -139,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("serve", help="run the live console")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
-    p.add_argument("--speed", type=float, default=12.0,
+    p.add_argument("--speed", type=float, default=2.0,
                    help="simulated intervals per real second")
     p.set_defaults(func=_serve)
 

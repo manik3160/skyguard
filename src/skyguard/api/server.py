@@ -198,14 +198,26 @@ def build_app(speed: float | None = None) -> FastAPI:
     `speed` is simulated 10-minute intervals per real second; a higher number
     scrolls the charts faster. Falls back to the `SKYGUARD_SPEED` environment
     variable (so a deployed instance can be tuned without a code change), then
-    to 12.
+    to 2 -- fast enough that the trace visibly moves, slow enough that a duty
+    forecaster can read the numbers without them flickering.
     """
     if speed is None:
-        speed = float(os.environ.get("SKYGUARD_SPEED", "12"))
+        speed = float(os.environ.get("SKYGUARD_SPEED", "2"))
 
     app = FastAPI(title="SkyGuard AI console", version="0.3.0")
     hub = Hub()
     injector = Injector()
+
+    @app.middleware("http")
+    async def _no_store(request, call_next):
+        # Every /api response is a snapshot of live state -- alerts, history,
+        # performance -- and must never be served from the browser cache. Without
+        # this, a heuristically-cached /api/alerts body resurrects a stale alert
+        # log after the operator has pressed Clear.
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     profiles = DEMO_NETWORK
     pipeline = SkyGuardPipeline(_console_settings())
