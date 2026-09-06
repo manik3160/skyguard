@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyGuard AI — AWS quality control</title>
+<style>
+/* ------------------------------------------------------------------
+   SkyGuard console. Light, card-based, dependency-free so it runs on a
+   venue laptop with no network. Green reads "trustworthy", amber
+   "watch", coral "fault". Each channel keeps its instrument's colour.
+   ------------------------------------------------------------------ */
+:root{
+  --bg:#f3f4f1;
+  --card:#ffffff;
+  --line:#e9e9e6;
+  --line-soft:#f0f0ed;
+  --ink:#181b17;
+  --ink-2:#5c6360;
+  --ink-3:#9aa09c;
+  --green:#5aa02c;
+  --green-soft:#eef6e6;
+  --lime:#bde05a;
+  --amber:#e6a23c;
+  --amber-soft:#fbf0dd;
+  --coral:#e0685a;
+  --coral-soft:#fbe9e6;
+  --temp:#e07a44;
+  --pres:#5b8fb0;
+  --humi:#3fa07a;
+  --radius:16px;
+  --radius-sm:10px;
+  --shadow:0 1px 2px rgba(23,27,22,.04), 0 6px 20px rgba(23,27,22,.04);
+  font-synthesis:none;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--ink);min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,system-ui,sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+.mono{font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;letter-spacing:-.01em}
+button{font:inherit;color:inherit;cursor:pointer}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#dcdcd8;border-radius:8px;border:3px solid var(--bg)}
+
+/* shell ---------------------------------------------------------- */
+.app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+
+.side{
+  padding:22px 16px;display:flex;flex-direction:column;gap:26px;
+  border-right:1px solid var(--line);background:var(--bg);
+}
+.brand{display:flex;align-items:center;gap:9px;padding:0 8px;font-weight:650;
+  font-size:16px;letter-spacing:-.02em}
+.brand .mark{width:22px;height:22px;border-radius:7px;
+  background:linear-gradient(150deg,var(--ink),#3a4036);display:grid;place-items:center}
+.brand .mark::after{content:"";width:9px;height:9px;border-radius:3px;background:var(--lime)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{
+  display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--radius-sm);
+  color:var(--ink-2);text-decoration:none;font-weight:500;
+}
+.nav a svg{width:17px;height:17px;flex:none;stroke-width:1.8}
+.nav a:hover{background:#eceee9;color:var(--ink)}
+.nav a.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.nav .divide{height:1px;background:var(--line);margin:10px 4px}
+.side .grow{flex:1}
+.side .tag{padding:0 8px;font-size:11px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+
+/* main --------------------------------------------------------- */
+.main{padding:20px 24px 32px;min-width:0}
+.top{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.top h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.02em}
+.top p{margin:2px 0 0;font-size:12.5px;color:var(--ink-2)}
+.top .spacer{flex:1}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;
+  background:var(--card);border:1px solid var(--line);border-radius:999px;
+  font-size:12.5px;color:var(--ink-2);font-weight:500;box-shadow:var(--shadow)
+}
+.chip b{color:var(--ink);font-weight:650}
+.chip.live{color:var(--green)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.dot.wait{background:var(--amber);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.35}}
+
+/* card grid --------------------------------------------------- */
+.grid{display:grid;grid-template-columns:1fr 360px;gap:16px;align-items:start}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px;box-shadow:var(--shadow)
+}
+.card > .hd{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.card .hd .t{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.card .hd .s{font-size:12px;color:var(--ink-3);margin-top:1px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+.badge{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;
+  border-radius:999px;font-size:12px;font-weight:600}
+.badge.ok{background:var(--green-soft);color:var(--green)}
+.badge.watch{background:var(--amber-soft);color:#b9791f}
+.badge.bad{background:var(--coral-soft);color:#c14d3f}
+
+/* hero readouts + charts ------------------------------------- */
+.reads{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:6px}
+.read{border:1px solid var(--line-soft);border-radius:var(--radius-sm);padding:12px 13px;background:#fcfcfb}
+.read .k{font-size:11.5px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.read .k i{width:8px;height:8px;border-radius:3px;display:block}
+.read .v{font-size:22px;font-weight:650;letter-spacing:-.02em;margin-top:4px}
+.read .v u{font-size:12px;font-weight:500;color:var(--ink-3);text-decoration:none;margin-left:3px}
+.read.flag{border-color:var(--coral);background:var(--coral-soft)}
+
+.trace{margin-top:12px;border-top:1px solid var(--line-soft);padding-top:6px}
+.trace .lane{display:flex;align-items:center;gap:10px;padding:4px 0}
+.trace .lane .nm{width:52px;font-size:11.5px;color:var(--ink-3)}
+.trace canvas{flex:1;height:52px;display:block}
+.legend{display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--ink-3)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:14px;height:0;border-top:2px solid currentColor;display:block}
+.legend i.dash{border-top-style:dashed}
+.legend i.band{height:12px;border:0;background:var(--coral-soft);border-radius:2px}
+
+/* roster ---------------------------------------------------- */
+.stations{display:flex;flex-direction:column;gap:8px}
+.st{
+  display:grid;grid-template-columns:34px 1fr auto;gap:11px;align-items:center;
+  padding:10px;border:1px solid var(--line-soft);border-radius:var(--radius-sm);
+  background:#fcfcfb;text-align:left;width:100%;
+}
+.st:hover{border-color:var(--line);background:#fff}
+.st.on{border-color:var(--green);background:var(--green-soft)}
+.st .av{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+  font-size:12px;font-weight:650;color:#fff}
+.st .nm{font-weight:600;font-size:13px}
+.st .id{font-size:11px;color:var(--ink-3)}
+.st .rd{font-size:11px;color:var(--ink-2);margin-top:2px}
+.st .h{font-size:13px;font-weight:650}
+.st .hbar{height:3px;width:44px;background:var(--line);border-radius:2px;margin-top:5px;overflow:hidden}
+.st .hbar i{display:block;height:100%;background:var(--green)}
+.st .hbar i.watch{background:var(--amber)}
+.st .hbar i.bad{background:var(--coral)}
+
+/* inject --------------------------------------------------- */
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:11.5px;color:var(--ink-3);font-weight:500}
+select{
+  appearance:none;background:#fcfcfb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa09c' stroke-width='2.4'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:9px 30px 9px 11px;font-size:13px;width:100%;
+}
+select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+.btns{display:flex;gap:8px;margin-top:4px}
+.btn{
+  height:38px;padding:0 16px;border-radius:var(--radius-sm);border:1px solid var(--line);
+  background:var(--card);font-weight:600;font-size:13px;
+}
+.btn:hover{background:#f6f6f4}
+.btn.go{background:var(--ink);color:#fff;border-color:var(--ink);flex:1}
+.btn.go:hover{background:#2c322b}
+.hint{font-size:11.5px;color:var(--ink-3);margin-top:10px}
+
+/* detection layers -------------------------------------------- */
+.layers{display:flex;gap:8px}
+.layer{flex:1;border:1px solid var(--line-soft);border-radius:var(--radius-sm);
+  padding:10px;background:#fcfcfb;text-align:center}
+.layer .lb{font-size:11px;font-weight:650}
+.layer .ds{font-size:10px;color:var(--ink-3);margin-top:2px;min-height:24px}
+.layer .mtr{height:4px;background:var(--line);border-radius:2px;margin-top:8px;overflow:hidden}
+.layer .mtr i{display:block;height:100%;width:0;background:var(--green);transition:width .4s ease}
+.layer.hit{border-color:var(--green);background:var(--green-soft)}
+.layer.hit .mtr i{background:var(--green)}
+
+/* gauge --------------------------------------------------- */
+.gauge{display:flex;flex-direction:column;align-items:center;padding-top:4px}
+.gauge svg{width:180px;height:100px}
+.gauge .num{font-size:26px;font-weight:650;letter-spacing:-.02em;margin-top:-30px}
+.gauge .cap{font-size:12px;color:var(--ink-3);margin-top:2px}
+
+/* alert detail ----------------------------------------------- */
+.detail .cause{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.detail .meta{font-size:12px;color:var(--ink-2);margin-top:2px}
+.detail p{font-size:12.5px;color:var(--ink-2);margin:12px 0 0;line-height:1.55}
+.detail .contrib{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.detail .contrib .r{display:grid;grid-template-columns:130px 1fr 32px;gap:8px;align-items:center;font-size:10.5px}
+.detail .contrib .r > span:first-child{color:var(--ink-2);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail .contrib .tk{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.detail .contrib .tk i{display:block;height:100%;background:var(--green)}
+.detail .contrib .pc{color:var(--ink-3);text-align:right}
+.detail .act{margin-top:12px;padding:11px 12px;background:var(--green-soft);
+  border-radius:var(--radius-sm);font-size:12.5px;color:#3f7220}
+.detail .act b{color:var(--green)}
+.detail .fix{font-size:12px;color:var(--ink-2);margin-top:8px}
+
+/* alert log ------------------------------------------------- */
+.log{display:flex;flex-direction:column}
+.log .lr{
+  display:grid;grid-template-columns:20px 1fr auto;gap:12px;align-items:center;
+  padding:11px 4px;border-bottom:1px solid var(--line-soft);text-align:left;width:100%;background:none;border-left:0;border-right:0;border-top:0;
+}
+.log .lr:last-child{border-bottom:0}
+.log .lr:hover{background:var(--line-soft)}
+.log .lr.on{background:var(--green-soft)}
+.log .sd{width:8px;height:8px;border-radius:50%;background:var(--amber);justify-self:center}
+.log .sd.critical{background:var(--coral)}
+.log .sd.info{background:var(--ink-3)}
+.log .c{font-weight:600;font-size:13px}
+.log .w{font-size:11.5px;color:var(--ink-3);margin-top:1px}
+.log .rt{font-size:11.5px;color:var(--ink-3);text-align:right}
+.log .rt b{display:block;color:var(--ink);font-weight:650;font-size:12.5px}
+
+.empty{padding:22px 4px;text-align:center;font-size:12.5px;color:var(--ink-3)}
+
+@media (max-width:1180px){
+  .grid{grid-template-columns:1fr}
+  .app{grid-template-columns:200px 1fr}
+}
+@media (max-width:720px){
+  .app{grid-template-columns:1fr}.side{display:none}
+  .row2{grid-template-columns:1fr}.reads{grid-template-columns:1fr 1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <nav class="side">
+    <div class="brand"><span class="mark"></span>SkyGuard</div>
+    <div>
+      <div class="tag">Console</div>
+      <div class="nav">
+        <a class="on" data-scroll="hero" href="#hero">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          Dashboard</a>
+        <a data-scroll="net" href="#net">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M12 7.5 6.5 15.5M12 7.5l5.5 8"/></svg>
+          Network</a>
+        <a data-scroll="log" href="#log">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3 3 20h18L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg>
+          Alerts</a>
+        <a data-scroll="layers" href="#layers">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13l9 5 9-5M3 18l9 5 9-5"/></svg>
+          Detection layers</a>
+        <a data-scroll="hero" href="#hero">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg>
+          Reports</a>
+      </div>
+    </div>
+    <div class="grow"></div>
+    <div class="nav">
+      <div class="divide"></div>
+      <a href="#hero">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22a10 10 0 1 0-10-10v3a3 3 0 0 0 3 3h1v-6H4"/><path d="M20 12v3a3 3 0 0 1-3 3h-1v-6h4"/></svg>
+        Support</a>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="top">
+      <div>
+        <h1>Network overview</h1>
+        <p>Automatic Weather Station quality control · IMD Haryana &amp; Himachal</p>
+      </div>
+      <div class="spacer"></div>
+      <span class="chip live" id="link"><span class="dot wait" id="link-dot"></span><span id="link-text">connecting</span></span>
+      <span class="chip">observations <b id="stat-count">0</b></span>
+      <span class="chip">caught <b id="stat-alerts">0</b></span>
+    </div>
+
+    <div class="grid">
+      <div class="col">
+
+        <!-- HERO: station monitor -->
+        <section class="card" id="hero">
+          <div class="hd">
+            <div>
+              <div class="t" id="hero-name">—</div>
+              <div class="s mono" id="hero-id">—</div>
+            </div>
+            <span class="badge ok" id="hero-badge">Nominal</span>
+          </div>
+          <div class="reads" id="reads">
+            <div class="read" data-channel="temperature">
+              <span class="k"><i style="background:var(--temp)"></i>Temperature</span>
+              <span class="v mono" data-value>—<u>°C</u></span>
+            </div>
+            <div class="read" data-channel="pressure">
+              <span class="k"><i style="background:var(--pres)"></i>Pressure</span>
+              <span class="v mono" data-value>—<u>hPa</u></span>
+            </div>
+            <div class="read" data-channel="humidity">
+              <span class="k"><i style="background:var(--humi)"></i>Humidity</span>
+              <span class="v mono" data-value>—<u>%</u></span>
+            </div>
+          </div>
+          <div class="trace">
+            <div class="lane"><span class="nm">Temp</span><canvas data-channel="temperature"></canvas></div>
+            <div class="lane"><span class="nm">Pressure</span><canvas data-channel="pressure"></canvas></div>
+            <div class="lane"><span class="nm">Humidity</span><canvas data-channel="humidity"></canvas></div>
+          </div>
+          <div class="legend">
+            <span style="color:var(--ink-2)"><i></i>measured</span>
+            <span style="color:var(--ink-2)"><i class="dash"></i>repaired estimate</span>
+            <span><i class="band"></i>flagged sample</span>
+          </div>
+        </section>
+
+        <div class="row2">
+          <!-- INJECT -->
+          <section class="card">
+            <div class="hd"><div><div class="t">Inject a fault</div>
+              <div class="s">Test the detector live</div></div></div>
+            <div class="field">
+              <label for="in-channel">Channel</label>
+              <select id="in-channel">
+                <option value="temperature">Temperature</option>
+                <option value="pressure">Pressure</option>
+                <option value="humidity">Humidity</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="in-fault">Fault type</label>
+              <select id="in-fault">
+                <option value="spike">Impulse spike</option>
+                <option value="stuck">Frozen sensor</option>
+                <option value="drift">Calibration drift</option>
+                <option value="offset_step">Bias step</option>
+                <option value="noise_burst">Noise burst</option>
+                <option value="dropout">Data dropout</option>
+                <option value="power_flicker">Power flicker</option>
+                <option value="physical_violation">Impossible humidity (108 %)</option>
+              </select>
+            </div>
+            <div class="btns">
+              <button class="btn go" id="in-go">Inject fault</button>
+              <button class="btn" id="in-clear">Clear</button>
+            </div>
+            <div class="hint">Runs on the selected station until you press Clear.</div>
+          </section>
+
+          <!-- GAUGE -->
+          <section class="card">
+            <div class="hd"><div><div class="t">Station health</div>
+              <div class="s" id="gauge-name">—</div></div></div>
+            <div class="gauge">
+              <svg viewBox="0 0 180 100">
+                <path d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--line)" stroke-width="14" stroke-linecap="round"/>
+                <path id="gauge-arc" d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--green)" stroke-width="14" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264" style="transition:stroke-dashoffset .5s ease,stroke .3s"/>
+              </svg>
+              <div class="num mono" id="gauge-num">—</div>
+              <div class="cap">health index · quarantine below 40</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- DETECTION LAYERS -->
+        <section class="card" id="layers">
+          <div class="hd"><div><div class="t">Detection layers</div>
+            <div class="s" id="layers-sub">Five checks, ordered by how easily weather fools them</div></div></div>
+          <div class="layers">
+            <div class="layer" data-layer="l0_physics"><div class="lb">L0 physics</div><div class="ds">Range · slew · dewpoint</div><div class="mtr"><i></i></div></div>
+            <div class="layer" data-layer="l1_temporal"><div class="lb">L1 temporal</div><div class="ds">Spikes · steps · freezes</div><div class="mtr"><i></i></div></div>
+            <div class="layer" data-layer="l2_multivariate"><div class="lb">L2 joint</div><div class="ds">Cross-channel impossible</div><div class="mtr"><i></i></div></div>
+            <div class="layer" data-layer="l3_sequence"><div class="lb">L3 sequence</div><div class="ds">Drift · noise bursts</div><div class="mtr"><i></i></div></div>
+            <div class="layer" data-layer="l4_spatial"><div class="lb">L4 spatial</div><div class="ds">Buddy check vs neighbours</div><div class="mtr"><i></i></div></div>
+          </div>
+        </section>
+
+        <!-- ALERT LOG -->
+        <section class="card" id="log">
+          <div class="hd"><div><div class="t">Alert log</div>
+            <div class="s">Injected faults, grouped into episodes · newest first</div></div></div>
+          <div class="log" id="alerts"><p class="empty">No alerts yet — inject a fault to see the detector react.</p></div>
+        </section>
+      </div>
+
+      <div class="col">
+        <!-- NETWORK ROSTER -->
+        <section class="card" id="net">
+          <div class="hd"><div><div class="t">Network</div>
+            <div class="s">4 stations · pick one to inspect</div></div></div>
+          <div class="stations" id="roster"></div>
+        </section>
+
+        <!-- ALERT DETAIL -->
+        <section class="card detail" id="detail">
+          <div class="hd"><div><div class="t">Why it fired</div>
+            <div class="s">Plain-language explanation</div></div></div>
+          <div id="detail-body"><p class="empty" style="padding:14px 0">Select an alert to see which layer caught it and what to do.</p></div>
+        </section>
+
+        <!-- THROUGHPUT -->
+        <section class="card">
+          <div class="hd"><div><div class="t">Pipeline</div>
+            <div class="s">Single-threaded Python</div></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div><div class="s" style="font-size:11.5px">Mean latency</div>
+              <div class="mono" style="font-size:20px;font-weight:650" id="stat-latency">—</div></div>
+            <div><div class="s" style="font-size:11.5px">Throughput</div>
+              <div class="mono" style="font-size:20px;font-weight:650" id="stat-throughput">—</div></div>
+          </div>
+          <div class="hint" id="pipe-note">The alert log shows faults you inject. On the clean stream the detector still flags <b id="stat-spont">—</b> of observations on its own — a known limit (<code>CLAUDE.md</code> §8).</div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const CHANNELS = ["temperature", "pressure", "humidity"];
+const CH_VAR = {temperature:"--temp", pressure:"--pres", humidity:"--humi"};
+const AV = {temperature:"#e07a44", pressure:"#5b8fb0", humidity:"#3fa07a"};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = v => (v === null || v === undefined) ? "—" : v.toFixed(1);
+
+const state = {
+  stations: [],
+  selected: null,
+  history: {},        // station_id -> [verdict payload]
+  alerts: [],
+  focused: null,      // alert shown in the detail card
+  count: 0,
+};
+
+/* ---- charts: hand-rolled canvas, no library ------------------- */
+function drawTrace(canvas, channel, rows){
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w) return;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const g = canvas.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+
+  const vals = rows.map(r => r.observation[channel]).filter(v => v !== null && v !== undefined);
+  if (vals.length < 2){
+    g.fillStyle = css("--ink-3"); g.font = '11px system-ui';
+    g.fillText("waiting for data", 4, h/2 + 3);
+    return;
+  }
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.2 || 1; lo -= pad; hi += pad;
+  const x = i => (i / Math.max(rows.length - 1, 1)) * (w - 4) + 2;
+  const y = v => h - 6 - ((v - lo) / (hi - lo)) * (h - 12);
+
+  // flagged bands
+  g.fillStyle = css("--coral-soft");
+  rows.forEach((r, i) => {
+    if (r.flagged && r.flagged.includes(channel)) g.fillRect(x(i) - 1.5, 2, 3, h - 4);
+  });
+
+  // soft area fill
+  const col = css(CH_VAR[channel]);
+  g.beginPath(); let started = false;
+  rows.forEach((r, i) => {
+    const v = r.observation[channel];
+    if (v === null || v === undefined){ started = false; return; }
+    if (!started){ g.moveTo(x(i), y(v)); started = true; } else g.lineTo(x(i), y(v));
+  });
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, col + "22"); grad.addColorStop(1, col + "00");
+  g.save(); g.lineTo(x(rows.length - 1), h); g.lineTo(x(0), h); g.closePath();
+  g.fillStyle = grad; g.fill(); g.restore();
+
+  // measured line
+  g.strokeStyle = col; g.lineWidth = 1.75; g.lineJoin = "round";
+  g.beginPath(); started = false;
+  rows.forEach((r, i) => {
+    const v = r.observation[channel];
+    if (v === null || v === undefined){ started = false; return; }
+    if (!started){ g.moveTo(x(i), y(v)); started = true; } else g.lineTo(x(i), y(v));
+  });
+  g.stroke();
+
+  // repaired estimate, dashed
+  g.strokeStyle = css("--ink"); g.setLineDash([3, 3]); g.lineWidth = 1.3;
+  g.beginPath(); started = false;
+  rows.forEach((r, i) => {
+    const v = r.repaired && r.repaired[channel];
+    if (v === undefined || v === null){ started = false; return; }
+    if (!started){ g.moveTo(x(i), y(v)); started = true; } else g.lineTo(x(i), y(v));
+  });
+  g.stroke(); g.setLineDash([]);
+
+  // last point marker
+  const last = rows[rows.length - 1];
+  const lv = last && last.observation[channel];
+  if (lv !== null && lv !== undefined){
+    g.fillStyle = col;
+    g.beginPath(); g.arc(x(rows.length - 1), y(lv), 2.6, 0, 7); g.fill();
+  }
+}
+
+function healthTone(v){ return v >= 70 ? "ok" : v >= 40 ? "watch" : "bad"; }
+function healthCls(v){ return v >= 70 ? "" : v >= 40 ? "watch" : "bad"; }
+
+function renderHero(){
+  const rows = state.history[state.selected] || [];
+  const latest = rows[rows.length - 1];
+  const s = state.stations.find(x => x.station_id === state.selected);
+  document.getElementById("hero-name").textContent = s ? s.name : "—";
+  document.getElementById("hero-id").textContent = state.selected || "—";
+
+  const health = latest && latest.health ? latest.health.station
+    : (s && s.health ? s.health.station : null);
+  const flagged = latest && latest.is_anomalous ? latest : null;
+  const badge = document.getElementById("hero-badge");
+  if (flagged){
+    badge.className = "badge bad";
+    badge.textContent = flagged.fault_label;
+  } else {
+    const tone = healthTone(health ?? 100);
+    badge.className = "badge " + tone;
+    badge.textContent = tone === "ok" ? "Nominal"
+      : tone === "watch" ? "Degraded" : "Quarantined";
+  }
+
+  document.querySelectorAll("#reads .read").forEach(el => {
+    const ch = el.dataset.channel;
+    const v = latest ? latest.observation[ch] : null;
+    el.querySelector("[data-value]").innerHTML =
+      (v === null || v === undefined ? "—" : v.toFixed(1)) +
+      `<u>${ch === "temperature" ? "°C" : ch === "pressure" ? "hPa" : "%"}</u>`;
+    el.classList.toggle("flag", !!(latest && latest.flagged && latest.flagged.includes(ch)));
+  });
+  document.querySelectorAll("#hero canvas").forEach(c =>
+    drawTrace(c, c.dataset.channel, rows));
+
+  // gauge
+  document.getElementById("gauge-name").textContent = s ? s.name : "—";
+  const hv = Math.max(0, Math.min(100, health ?? 0));
+  const arc = document.getElementById("gauge-arc");
+  arc.style.strokeDashoffset = String(264 - 264 * hv / 100);
+  arc.style.stroke = css(hv >= 70 ? "--green" : hv >= 40 ? "--amber" : "--coral");
+  document.getElementById("gauge-num").textContent = health == null ? "—" : hv.toFixed(0);
+}
+
+function renderRoster(){
+  const host = document.getElementById("roster");
+  host.innerHTML = "";
+  state.stations.forEach(s => {
+    const rows = state.history[s.station_id] || [];
+    const latest = rows[rows.length - 1];
+    const health = latest && latest.health ? latest.health.station
+      : (s.health ? s.health.station : null);
+    const rd = latest ? latest.observation : {};
+    const hv = health ?? 100;
+    const init = s.name.slice(0, 2).toUpperCase();
+    const b = document.createElement("button");
+    b.className = "st" + (s.station_id === state.selected ? " on" : "");
+    b.innerHTML = `
+      <span class="av" style="background:${AV[CHANNELS[0]] && "#3a4036"};background:linear-gradient(150deg,#3a4036,#5c6360)">${init}</span>
+      <span>
+        <span class="nm">${s.name}</span>
+        <span class="rd mono">${fmt(rd.temperature)}° · ${fmt(rd.pressure)} hPa · ${fmt(rd.humidity)}%</span>
+        <span class="id mono">${s.station_id}</span>
+      </span>
+      <span style="text-align:right">
+        <span class="h mono">${health == null ? "—" : hv.toFixed(0)}</span>
+        <span class="hbar"><i class="${healthCls(hv)}" style="width:${Math.max(hv, 3)}%"></i></span>
+      </span>`;
+    b.onclick = () => { state.selected = s.station_id; renderRoster(); renderHero(); };
+    host.appendChild(b);
+  });
+}
+
+function renderLayers(){
+  const a = state.focused;
+  const byLayer = {};
+  if (a) a.evidence.forEach(e => {
+    byLayer[e.detector] = Math.max(byLayer[e.detector] || 0, e.score);
+  });
+  document.querySelectorAll(".layer").forEach(el => {
+    const sc = byLayer[el.dataset.layer] || 0;
+    el.classList.toggle("hit", sc > 0.01);
+    el.querySelector(".mtr i").style.width = Math.round(Math.min(sc, 1) * 100) + "%";
+  });
+  document.getElementById("layers-sub").textContent = a
+    ? `Contributions to: ${a.fault_label} at ${a.station_id}`
+    : "Five checks, ordered by how easily weather fools them";
+}
+
+function relTime(ts){
+  const d = new Date(ts * 1000);
+  return d.toISOString().slice(11, 16) + "Z";
+}
+
+/* Collapse a run of alerts on the same station+channels into one episode row.
+   A sustained fault fires every sample; grouping on channels (not the fault
+   label) keeps it a single row even when the root-cause classifier disagrees
+   with itself on the odd sample. */
+function episodes(){
+  const out = [];
+  for (const a of state.alerts){
+    const key = a.station_id + "|" + a.flagged.slice().sort().join(",");
+    const last = out[out.length - 1];
+    if (last && last.key === key){ last.n++; last.start = a; }
+    else out.push({key, latest: a, start: a, n: 1});
+  }
+  return out;
+}
+
+function renderAlerts(){
+  const host = document.getElementById("alerts");
+  const eps = episodes();
+  if (!eps.length){
+    host.innerHTML = '<p class="empty">No alerts yet — inject a fault to see the detector react.</p>';
+    return;
+  }
+  host.innerHTML = "";
+  eps.slice(0, 12).forEach(ep => {
+    const a = ep.latest;
+    const b = document.createElement("button");
+    const sameEp = state.focused && state.focused.station_id === a.station_id
+      && state.focused.flagged.slice().sort().join() === a.flagged.slice().sort().join();
+    b.className = "lr" + (sameEp ? " on" : "");
+    const span = ep.n > 1
+      ? `${relTime(ep.start.timestamp)}–${relTime(a.timestamp)} · ${ep.n} samples`
+      : `${relTime(a.timestamp)}`;
+    b.innerHTML = `
+      <span class="sd ${a.severity}"></span>
+      <span>
+        <span class="c">${a.fault_label}</span>
+        <span class="w mono">${a.station_id} · ${a.flagged.join(", ")} · ${span}</span>
+      </span>
+      <span class="rt mono"><b>${(a.confidence*100).toFixed(0)}%</b>confidence</span>`;
+    b.onclick = () => { state.focused = a; renderAlerts(); renderDetail(); renderLayers(); };
+    host.appendChild(b);
+  });
+}
+
+function renderDetail(){
+  const host = document.getElementById("detail-body");
+  const a = state.focused;
+  if (!a){
+    host.innerHTML = '<p class="empty" style="padding:14px 0">Select an alert to see which layer caught it and what to do.</p>';
+    return;
+  }
+  const at = a.attributions[0];
+  const contrib = at ? at.contributions.map(c => `
+    <div class="r"><span>${c.feature}</span>
+      <span class="tk"><i style="width:${(c.share*100).toFixed(0)}%"></i></span>
+      <span class="pc mono">${(c.share*100).toFixed(0)}%</span></div>`).join("") : "";
+  const repaired = a.repaired
+    ? Object.entries(a.repaired).map(([k, v]) => `${k} → ${v}`).join(" · ") : null;
+  host.innerHTML = `
+    <div class="cause">${a.fault_label}</div>
+    <div class="meta mono">${a.station_id} · ${a.flagged.join(", ")} · ${(a.confidence*100).toFixed(0)}% confidence · ${a.severity}</div>
+    <p>${at ? at.narrative : "Flagged by the physics layer."}</p>
+    <div class="contrib">${contrib}</div>
+    <div class="act"><b>Suggested action:</b> ${a.action}</div>
+    ${repaired ? `<div class="fix">Corrected estimate: <span class="mono">${repaired}</span></div>` : ""}`;
+}
+
+/* ---- transport ---------------------------------------------- */
+let lastWs = 0;
+
+function link(){
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  const dot = document.getElementById("link-dot");
+  const text = document.getElementById("link-text");
+  ws.onopen = () => { dot.classList.remove("wait"); text.textContent = "live"; };
+  ws.onclose = () => { dot.classList.add("wait"); text.textContent = "reconnecting"; setTimeout(link, 1500); };
+  ws.onmessage = ev => {
+    lastWs = Date.now();
+    const m = JSON.parse(ev.data);
+    if (m.type === "history"){
+      state.history[m.station_id] = m.data;
+    } else if (m.type === "verdict"){
+      const row = m.data;
+      const rows = state.history[row.station_id] ||= [];
+      rows.push(row); if (rows.length > 144) rows.shift();
+      state.count++;
+      if (row.is_anomalous && row.probed){
+        state.alerts.unshift(row);
+        if (state.alerts.length > 40) state.alerts.pop();
+        state.focused = row;
+        renderAlerts(); renderDetail(); renderLayers();
+      }
+      document.getElementById("stat-count").textContent = state.count.toLocaleString();
+      document.getElementById("stat-alerts").textContent = episodes().length;
+    }
+    schedule();
+  };
+}
+
+let pending = false;
+function schedule(){
+  if (pending) return; pending = true;
+  requestAnimationFrame(() => { pending = false; renderHero(); renderRoster(); });
+}
+
+async function boot(){
+  const stations = await (await fetch("/api/stations")).json();
+  state.stations = stations;
+  state.selected = stations[0].station_id;
+  for (const s of stations)
+    state.history[s.station_id] = await (await fetch(`/api/history/${s.station_id}`)).json();
+  state.alerts = await (await fetch("/api/alerts")).json();
+  if (state.alerts.length) state.focused = state.alerts[0];
+  renderHero(); renderRoster(); renderAlerts(); renderDetail(); renderLayers();
+  link();
+
+  setInterval(async () => {
+    try {
+      const p = await (await fetch("/api/performance")).json();
+      document.getElementById("stat-latency").textContent = p.mean_latency_ms.toFixed(2) + " ms";
+      document.getElementById("stat-throughput").textContent =
+        Math.round(p.throughput_per_second).toLocaleString() + " /s";
+      if (p.spontaneous_flags != null && p.live_observations > 0){
+        const rate = 100 * p.spontaneous_flags / p.live_observations;
+        document.getElementById("stat-spont").textContent = rate.toFixed(1) + " %";
+      }
+    } catch (e) { /* transient */ }
+  }, 2000);
+
+  // Fallback: if the WebSocket is blocked (some venue proxies drop it), keep the
+  // console alive by polling. Cheap -- four small JSON bodies every 3 s.
+  setInterval(async () => {
+    if (Date.now() - lastWs < 4000) return;
+    try {
+      for (const s of state.stations)
+        state.history[s.station_id] = await (await fetch(`/api/history/${s.station_id}`)).json();
+      const before = state.alerts.length;
+      state.alerts = await (await fetch("/api/alerts")).json();
+      if (state.alerts.length && (!state.focused || state.alerts.length !== before))
+        state.focused = state.alerts[0];
+      renderHero(); renderRoster(); renderAlerts(); renderDetail(); renderLayers();
+      document.getElementById("stat-alerts").textContent = episodes().length;
+    } catch (e) { /* transient */ }
+  }, 3000);
+}
+
+document.getElementById("in-go").onclick = () => fetch("/api/inject", {
+  method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify({
+    station_id: state.selected,
+    channel: document.getElementById("in-channel").value,
+    fault: document.getElementById("in-fault").value,
+    duration: 4000,
+  }),
+});
+document.getElementById("in-clear").onclick = () => fetch("/api/clear", {
+  method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify({station_id: state.selected}),
+});
+
+document.querySelectorAll(".nav a[data-scroll]").forEach(a => {
+  a.onclick = e => {
+    document.querySelectorAll(".nav a").forEach(x => x.classList.remove("on"));
+    a.classList.add("on");
+  };
+});
+
+window.addEventListener("resize", schedule);
+boot();
+</script>
+</body>
+</html>

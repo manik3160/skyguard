@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "skyguard"
+version = "0.3.0"
+description = "Real-time anomaly detection for Automatic Weather Stations (SIH 2026, PS 26073)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = ["numpy>=1.26", "scikit-learn>=1.4"]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[project.scripts]
+skyguard = "skyguard.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skyguard"]
+
+[tool.ruff]
+line-length = 95
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
