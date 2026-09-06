@@ -240,6 +240,31 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
 .perf .p1 .v{font-size:20px;font-weight:650}
 .perf .p1 .n{font-size:10.5px;color:var(--ink-3)}
 
+/* alert banner: the one thing a judge at the back of the room must see -- */
+.alert-banner{
+  display:flex;align-items:center;gap:14px;margin-bottom:16px;
+  padding:14px 18px;border-radius:var(--radius);
+  background:#d7362a;color:#fff;
+  box-shadow:0 2px 6px rgba(215,54,42,.35),0 10px 30px rgba(215,54,42,.28);
+  animation:banner-in .25s ease-out, banner-glow 1.6s ease-in-out infinite;
+}
+@keyframes banner-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes banner-glow{50%{box-shadow:0 2px 6px rgba(215,54,42,.5),0 10px 38px rgba(215,54,42,.5)}}
+.alert-banner .ab-icon{
+  width:30px;height:30px;flex:none;border-radius:50%;
+  background:rgba(255,255,255,.18);display:grid;place-items:center;
+  font-weight:800;font-size:17px
+}
+.alert-banner .ab-text{flex:1;min-width:0}
+.alert-banner .ab-title{font-weight:700;font-size:15px;letter-spacing:-.01em}
+.alert-banner .ab-sub{font-size:12.5px;opacity:.9;margin-top:1px}
+.alert-banner .ab-conf{
+  flex:none;font-weight:700;font-size:15px;padding:5px 11px;
+  background:rgba(255,255,255,.16);border-radius:999px
+}
+.st.bad{border-color:var(--coral);background:var(--coral-soft)}
+.st.bad .nm{color:#c14d3f}
+
 @media (max-width:1180px){
   .workspace{grid-template-columns:1fr}
   .app{grid-template-columns:200px 1fr}
@@ -300,6 +325,15 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
       <span class="chip live" id="link"><span class="dot wait" id="link-dot"></span><span id="link-text">connecting</span></span>
       <span class="chip">observations <b id="stat-count">0</b></span>
       <span class="chip">caught <b id="stat-alerts">0</b></span>
+    </div>
+
+    <div class="alert-banner" id="banner" hidden>
+      <span class="ab-icon">!</span>
+      <div class="ab-text">
+        <div class="ab-title" id="banner-title">Sensor fault</div>
+        <div class="ab-sub" id="banner-sub">—</div>
+      </div>
+      <span class="ab-conf mono" id="banner-conf">—</span>
     </div>
 
     <div class="workspace">
@@ -611,6 +645,35 @@ function renderSummary(){
   set("sum-eps", episodes().length);
 }
 
+const CH_UNIT = {temperature:"°C", pressure:"hPa", humidity:"%"};
+
+/* The big red bar. Shows while any station's most recent reading is
+   flagged; clears on its own a sample or two after the fault stops. */
+function renderBanner(){
+  const banner = document.getElementById("banner");
+  let hit = null;
+  for (const s of state.stations){
+    const l = latestFor(s.station_id);
+    // Only a fault under active investigation raises the bar. A bare
+    // is_anomalous can be a clean-stream false positive (CLAUDE.md S8);
+    // those belong in the counter, not a full-width red alert.
+    if (l && l.is_anomalous && l.probed){ hit = {s, l}; break; }
+  }
+  if (!hit){ banner.hidden = true; return; }
+  const {s, l} = hit;
+  const chans = (l.flagged || []).map(c =>
+    `${c[0].toUpperCase()}${c.slice(1)}`).join(", ") || "multiple channels";
+  const vals = (l.flagged || []).map(c =>
+    `${c} ${fmt(l.observation[c])}${CH_UNIT[c] || ""}`).join("  ");
+  document.getElementById("banner-title").textContent =
+    `SENSOR FAULT — ${s.name} · ${chans}`;
+  document.getElementById("banner-sub").textContent =
+    `${l.fault_label}${vals ? "  ·  " + vals : ""}  ·  ${s.station_id}`;
+  document.getElementById("banner-conf").textContent =
+    `${(l.confidence * 100).toFixed(0)}%`;
+  banner.hidden = false;
+}
+
 function renderHero(){
   const rows = state.history[state.selected] || [];
   const latest = rows[rows.length - 1];
@@ -664,8 +727,10 @@ function renderRoster(){
     const rd = latest ? latest.observation : {};
     const hv = health ?? 100;
     const init = s.name.slice(0, 2).toUpperCase();
+    const flagged = latest && latest.is_anomalous && latest.probed;
     const b = document.createElement("button");
-    b.className = "st" + (s.station_id === state.selected ? " on" : "");
+    b.className = "st" + (s.station_id === state.selected ? " on" : "")
+      + (flagged ? " bad" : "");
     b.innerHTML = `
       <span class="av" style="background:linear-gradient(150deg,#3a4036,#5c6360)">${init}</span>
       <span>
@@ -770,7 +835,7 @@ function renderDetail(){
 
 function renderAll(){
   renderHero(); renderRoster(); renderAlerts(); renderDetail();
-  renderLayers(); renderSummary();
+  renderLayers(); renderSummary(); renderBanner();
 }
 
 /* ---- routing: real views, no scrolling ----------------------- */
@@ -823,21 +888,21 @@ function link(){
   };
 }
 
-/* Coalesce paints and cap them at ~2 Hz. The stream itself is slowed
-   server-side (SKYGUARD_SPEED default 3); this keeps a burst of catch-up
-   messages after a reconnect from stuttering the charts. */
-let pending = false, lastPaint = 0;
+/* Repaint at most ~3 Hz. Gated on a timestamp rather than a timer or
+   requestAnimationFrame: both are throttled hard (or frozen) in a
+   backgrounded tab, which would strand the alert banner. onmessage fires
+   on every stream frame regardless of tab state, so this stays live. */
+let lastPaint = 0, trailing = null;
 function schedule(){
-  if (pending) return;
-  pending = true;
-  requestAnimationFrame(() => {
-    pending = false;
-    const now = performance.now();
-    const wait = 500 - (now - lastPaint);
-    if (wait > 0){ setTimeout(schedule, wait); return; }
+  const now = Date.now();
+  if (now - lastPaint >= 320){
     lastPaint = now;
+    if (trailing){ clearTimeout(trailing); trailing = null; }
     renderAll();
-  });
+  } else if (!trailing){
+    trailing = setTimeout(() => { trailing = null; lastPaint = Date.now(); renderAll(); },
+      320 - (now - lastPaint));
+  }
 }
 
 async function boot(){
@@ -851,6 +916,10 @@ async function boot(){
 
   setView(location.hash.slice(1) || "dashboard");
   link();
+
+  // Backstop: if the stream goes quiet (or its frames are being dropped)
+  // this still refreshes health, the banner and relative timestamps.
+  setInterval(renderAll, 1000);
 
   setInterval(async () => {
     try {
@@ -896,10 +965,14 @@ document.getElementById("in-clear").onclick = async () => {
     method: "POST", headers: {"Content-Type": "application/json"}, body: "{}",
   });
   state.alerts = []; state.focused = null;
+  // Drop the "probed" mark on buffered rows so the banner and red roster
+  // rows clear on the click, not one stream frame later.
+  for (const rows of Object.values(state.history))
+    for (const r of rows) r.probed = false;
   renderAll();
 };
 
-window.addEventListener("resize", schedule);
+window.addEventListener("resize", renderAll);
 boot();
 </script>
 </body>
