@@ -39,19 +39,37 @@ HISTORY = 144
 def _console_settings():
     """Settings for the live console.
 
-    One deliberate deviation from the benchmarked defaults: `alert_threshold` is
-    raised to 0.85 so the clean baseline stays quiet and the injected fault is
-    unambiguously the thing that lights up (an injected fault is 5-50 sigma, so
-    it still trips every gate). The calibrated operating point for *scoring* is
-    0.60 (see `evaluation/calibrate.py`); this is a presentation choice, not a
-    tuning claim.
+    Two deliberate deviations from the benchmarked defaults, both presentation
+    choices rather than tuning claims -- `make bench` / `make calibrate` still
+    run on `Settings()`:
+
+    * `alert_threshold` is raised to 0.85 so the clean baseline stays quiet and
+      the injected fault is unambiguously the thing that lights up (an injected
+      fault is 5-50 sigma, so it still trips every gate). The calibrated
+      operating point for *scoring* is 0.60 (see `evaluation/calibrate.py`).
+
+    * The health index is retimed for compressed demo time, for the same reason
+      `_refresh_drift` is disabled below. `anomaly_halflife` ships at 1008
+      samples (one real deployment week); at the console's ~2 samples/sec that
+      is ~8 minutes of wall-clock per half-life, so a station knocked down by a
+      rehearsal fault would read "quarantined" for the rest of the demo. 48
+      samples restores a human-scale recovery (~90 s). A slightly higher
+      `saturating_anomaly_rate` keeps a brief clean-stream false positive from
+      slamming the bar to zero while still letting a *sustained* injected fault
+      drive it right down.
     """
     from dataclasses import replace
 
     from ..config import Settings
 
     base = Settings()
-    return replace(base, detector=replace(base.detector, alert_threshold=0.85))
+    return replace(
+        base,
+        detector=replace(base.detector, alert_threshold=0.85),
+        health=replace(
+            base.health, anomaly_halflife=48, saturating_anomaly_rate=0.45
+        ),
+    )
 
 
 class Injector:
@@ -235,12 +253,20 @@ def build_app(speed: float | None = None) -> FastAPI:
     # 45-55 degC a mid-May origin would show for Haryana.
     generator = NetworkGenerator(profiles, 1_707_912_000.0, seed=17)
     warmup = generator.generate(1_500)
-    pipeline.fit(warmup[profiles[0].station_id])
+    # Fit the learned layers on every station's clean warm-up, not just the
+    # first station's. The network spans 2 km of elevation; a model that has
+    # only seen Ambala's plains climate scores Shimla's (entirely normal) daily
+    # humidity swing as anomalous. Concatenated, not interleaved: the fit replays
+    # each run through one StationState, so the runs must stay contiguous.
+    pipeline.fit([obs for profile in profiles for obs in warmup[profile.station_id]])
     # Prime every station's rolling buffers so the console is live immediately
-    # rather than showing "warming up" for the first minute of the demo.
-    for i in range(400):
+    # rather than showing "warming up" for the first minute of the demo. 900
+    # samples is past the point where the local forecast and residual scale have
+    # settled for every profile.
+    prime = 900
+    for i in range(prime):
         for profile in profiles:
-            pipeline.process(warmup[profile.station_id][-400 + i])
+            pipeline.process(warmup[profile.station_id][-prime + i])
 
     history: dict[str, deque] = {p.station_id: deque(maxlen=HISTORY) for p in profiles}
     alerts: deque = deque(maxlen=40)
@@ -338,9 +364,13 @@ def build_app(speed: float | None = None) -> FastAPI:
         station_id = (body or {}).get("station_id")
         injector.clear(station_id)
         # A bare clear ("Clear" in the UI) is a full reset between demo runs:
-        # drop the alert log too, otherwise the last fault's episode lingers.
+        # drop the alert log and forget every station's accumulated anomaly
+        # rate, otherwise the last fault's episode and its health hit linger
+        # into the next run.
         if not station_id:
             alerts.clear()
+            for profile in profiles:
+                pipeline.health_for(profile.station_id).reset()
         return JSONResponse({"cleared": True})
 
     @app.websocket("/ws")

@@ -30,6 +30,17 @@ class SensorHealth:
         self._drift_per_day: dict[Channel, float] = {c: 0.0 for c in CHANNELS}
         self._samples = 0
 
+    def reset(self) -> None:
+        """Forget all accumulated state.
+
+        Used by the console's "clear" control so a demo run starts from a clean
+        slate instead of carrying a rehearsal fault's anomaly rate into the
+        next run.
+        """
+        self._anomaly_rate = {c: 0.0 for c in CHANNELS}
+        self._drift_per_day = {c: 0.0 for c in CHANNELS}
+        self._samples = 0
+
     def update(self, flagged: frozenset[Channel]) -> None:
         for channel in CHANNELS:
             hit = 1.0 if channel in flagged else 0.0

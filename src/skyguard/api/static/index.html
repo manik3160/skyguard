@@ -129,10 +129,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 .read .v u{font-size:12px;font-weight:500;color:var(--ink-3);text-decoration:none;margin-left:3px}
 .read.flag{border-color:var(--coral);background:var(--coral-soft)}
 
+.herotop{display:flex;gap:18px;align-items:center}
+.herotop .reads{flex:1;margin-bottom:0}
+.herotop .gauge{flex:none;width:170px}
+
 .trace{margin-top:12px;border-top:1px solid var(--line-soft);padding-top:6px}
-.trace .lane{display:flex;align-items:center;gap:10px;padding:4px 0}
+.trace .lane{display:flex;align-items:center;gap:10px;padding:3px 0}
 .trace .lane .nm{width:52px;font-size:11.5px;color:var(--ink-3)}
-.trace canvas{flex:1;height:52px;display:block}
+.trace canvas{flex:1;height:44px;display:block}
 .legend{display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--ink-3);flex-wrap:wrap}
 .legend span{display:flex;align-items:center;gap:6px}
 .legend i{width:14px;height:0;border-top:2px solid currentColor;display:block}
@@ -197,9 +201,9 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
 
 /* gauge --------------------------------------------------- */
 .gauge{display:flex;flex-direction:column;align-items:center;padding-top:4px}
-.gauge svg{width:180px;height:100px}
-.gauge .num{font-size:26px;font-weight:650;letter-spacing:-.02em;margin-top:-30px}
-.gauge .cap{font-size:12px;color:var(--ink-3);margin-top:2px}
+.gauge svg{width:160px;height:88px}
+.gauge .num{font-size:24px;font-weight:650;letter-spacing:-.02em;margin-top:-26px}
+.gauge .cap{font-size:11px;color:var(--ink-3);margin-top:3px;text-align:center}
 
 /* alert detail ----------------------------------------------- */
 .detail .cause{font-size:15px;font-weight:650;letter-spacing:-.01em}
@@ -277,6 +281,8 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
   .nav .divide{display:none}
   .row2{grid-template-columns:1fr}.reads{grid-template-columns:1fr 1fr}
   .strip{grid-template-columns:1fr 1fr}
+  .herotop{flex-direction:column;align-items:stretch}
+  .herotop .gauge{width:100%}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -360,18 +366,28 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
               </div>
               <span class="badge ok" id="hero-badge">Nominal</span>
             </div>
-            <div class="reads" id="reads">
-              <div class="read" data-channel="temperature">
-                <span class="k"><i style="background:var(--temp)"></i>Temperature</span>
-                <span class="v mono" data-value>—<u>°C</u></span>
+            <div class="herotop">
+              <div class="reads" id="reads">
+                <div class="read" data-channel="temperature">
+                  <span class="k"><i style="background:var(--temp)"></i>Temperature</span>
+                  <span class="v mono" data-value>—<u>°C</u></span>
+                </div>
+                <div class="read" data-channel="pressure">
+                  <span class="k"><i style="background:var(--pres)"></i>Pressure</span>
+                  <span class="v mono" data-value>—<u>hPa</u></span>
+                </div>
+                <div class="read" data-channel="humidity">
+                  <span class="k"><i style="background:var(--humi)"></i>Humidity</span>
+                  <span class="v mono" data-value>—<u>%</u></span>
+                </div>
               </div>
-              <div class="read" data-channel="pressure">
-                <span class="k"><i style="background:var(--pres)"></i>Pressure</span>
-                <span class="v mono" data-value>—<u>hPa</u></span>
-              </div>
-              <div class="read" data-channel="humidity">
-                <span class="k"><i style="background:var(--humi)"></i>Humidity</span>
-                <span class="v mono" data-value>—<u>%</u></span>
+              <div class="gauge">
+                <svg viewBox="0 0 180 100">
+                  <path d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--line)" stroke-width="14" stroke-linecap="round"/>
+                  <path id="gauge-arc" d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--green)" stroke-width="14" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264" style="transition:stroke-dashoffset .5s ease,stroke .3s"/>
+                </svg>
+                <div class="num mono" id="gauge-num">—</div>
+                <div class="cap">health index · <span id="gauge-name">—</span> · quarantine &lt; 40</div>
               </div>
             </div>
             <div class="trace">
@@ -383,19 +399,6 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
               <span style="color:var(--ink-2)"><i></i>measured</span>
               <span style="color:var(--ink-2)"><i class="dash"></i>repaired estimate</span>
               <span><i class="band"></i>flagged sample</span>
-            </div>
-          </section>
-
-          <section class="card">
-            <div class="hd"><div><div class="t">Station health</div>
-              <div class="s" id="gauge-name">—</div></div></div>
-            <div class="gauge">
-              <svg viewBox="0 0 180 100">
-                <path d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--line)" stroke-width="14" stroke-linecap="round"/>
-                <path id="gauge-arc" d="M12 96 A84 84 0 0 1 168 96" fill="none" stroke="var(--green)" stroke-width="14" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264" style="transition:stroke-dashoffset .5s ease,stroke .3s"/>
-              </svg>
-              <div class="num mono" id="gauge-num">—</div>
-              <div class="cap">health index · quarantine below 40</div>
             </div>
           </section>
         </div>
@@ -427,6 +430,7 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
               <div class="layer" data-layer="l3_sequence"><div class="lb">L3 sequence</div><div class="ds">Drift · noise bursts</div><div class="mtr"><i></i></div></div>
               <div class="layer" data-layer="l4_spatial"><div class="lb">L4 spatial</div><div class="ds">Buddy check vs neighbours</div><div class="mtr"><i></i></div></div>
             </div>
+            <p class="hint" id="layers-hint">Inject a fault, then open its alert to see how much each layer contributed.</p>
             <div class="ltable">
               <div class="lr"><b>L0 physics</b><span>Range, slew rate, dewpoint ≤ temperature. Catches the impossible; weather never fools it.</span><span class="w">1.00</span></div>
               <div class="lr"><b>L1 temporal</b><span>Hampel on the forecast residual plus a stuck test. Catches spikes, steps, frozen sensors.</span><span class="w">0.85</span></div>
@@ -525,7 +529,6 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
 
 const CHANNELS = ["temperature", "pressure", "humidity"];
 const CH_VAR = {temperature:"--temp", pressure:"--pres", humidity:"--humi"};
-const AV = {temperature:"#e07a44", pressure:"#5b8fb0", humidity:"#3fa07a"};
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fmt = v => (v === null || v === undefined) ? "—" : v.toFixed(1);
 // Every /api body is a live snapshot; a cached one resurrects state the
@@ -762,6 +765,8 @@ function renderLayers(){
   if (sub) sub.textContent = a
     ? `Contributions to: ${a.fault_label} at ${a.station_id}`
     : "Five checks, ordered by how easily weather fools them";
+  const hint = document.getElementById("layers-hint");
+  if (hint) hint.hidden = !!a;
 }
 
 function relTime(ts){
