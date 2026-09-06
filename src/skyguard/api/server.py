@@ -139,7 +139,12 @@ class Injector:
         }[channel]
         match fault:
             case FaultType.SPIKE:
-                return value + 9.0 * scale
+                # A real impulse: one sample far off, then back to normal, on a
+                # roughly three-hour cadence so there is always a fresh one to
+                # point at during the demo. A sustained shift would read (and
+                # classify) as a bias step; too large a jump and the multivariate
+                # layer calls the T/RH pair impossible instead of a spike.
+                return value + 7.0 * scale if state["elapsed"] % 20 == 0 else value
             case FaultType.STUCK:
                 if state["held"] is None:
                     state["held"] = value
@@ -318,7 +323,12 @@ def build_app(speed: float | None = None) -> FastAPI:
 
     @app.post("/api/clear")
     async def clear(body: dict | None = None) -> JSONResponse:
-        injector.clear((body or {}).get("station_id"))
+        station_id = (body or {}).get("station_id")
+        injector.clear(station_id)
+        # A bare clear ("Clear" in the UI) is a full reset between demo runs:
+        # drop the alert log too, otherwise the last fault's episode lingers.
+        if not station_id:
+            alerts.clear()
         return JSONResponse({"cleared": True})
 
     @app.websocket("/ws")

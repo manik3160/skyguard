@@ -82,9 +82,11 @@ Then be straight about the rest (`make ablation`):
 > Point recall is about 0.58 on the network: we used to lose long faults once
 > our own baseline adapted to them, and the fix was to stop re-seeding a
 > channel's baseline while the neighbouring stations still disagree with it.
-> That took point recall from 0.55 to 0.58 and gave the spatial layer a
-> measurable reason to exist — at unchanged clean-stream false-positive rate.
-> Precision still needs work. That's the honest characterisation."
+> That took point recall from 0.55 to 0.58, at unchanged clean-stream
+> false-positive rate. Root-cause labelling is about 0.44 and our weakest
+> layer — detection is solid, the *name* it puts on a fault is fuzzier for
+> spike-versus-step. Precision still needs work. That's the honest
+> characterisation."
 
 Judges from IMD will trust a stated weakness far more than a suspiciously round
 number.

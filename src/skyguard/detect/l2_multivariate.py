@@ -129,6 +129,11 @@ class MultivariateDetector(StatelessDetector):
             # breakdown, and it is exact rather than a heuristic.
             shares = self._attribute(residual)
             score = squash(d2, threshold)
+            # "Physical violation" is a *cross-sensor* inconsistency, so only
+            # suggest it when the departure is genuinely spread across channels.
+            # A single channel carrying the whole distance is a spike or a step
+            # on that sensor -- name it nothing here and let L1/L3 classify it.
+            spread = sum(1 for s in shares if s >= 0.20) >= 2
             for channel, share in zip(CHANNELS, shares, strict=True):
                 if share < 0.15:
                     continue
@@ -144,7 +149,9 @@ class MultivariateDetector(StatelessDetector):
                             f"Mahalanobis units from normal; this channel "
                             f"accounts for {share * 100:.0f} % of the departure."
                         ),
-                        suggests=FaultType.PHYSICAL_VIOLATION,
+                        suggests=(
+                            FaultType.PHYSICAL_VIOLATION if spread else FaultType.NONE
+                        ),
                     )
                 )
 

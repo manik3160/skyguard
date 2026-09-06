@@ -325,14 +325,14 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
             <div class="field">
               <label for="in-fault">Fault type</label>
               <select id="in-fault">
-                <option value="spike">Impulse spike</option>
+                <option value="physical_violation">Impossible humidity (108 %)</option>
                 <option value="stuck">Frozen sensor</option>
+                <option value="dropout">Data dropout</option>
                 <option value="drift">Calibration drift</option>
+                <option value="spike">Impulse spike</option>
                 <option value="offset_step">Bias step</option>
                 <option value="noise_burst">Noise burst</option>
-                <option value="dropout">Data dropout</option>
                 <option value="power_flicker">Power flicker</option>
-                <option value="physical_violation">Impossible humidity (108 %)</option>
               </select>
             </div>
             <div class="btns">
@@ -393,17 +393,25 @@ select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
           <div id="detail-body"><p class="empty" style="padding:14px 0">Select an alert to see which layer caught it and what to do.</p></div>
         </section>
 
-        <!-- THROUGHPUT -->
+        <!-- PIPELINE -->
         <section class="card">
           <div class="hd"><div><div class="t">Pipeline</div>
-            <div class="s">Single-threaded Python</div></div></div>
+            <div class="s">Single-threaded Python, whole network on one core</div></div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div><div class="s" style="font-size:11.5px">Mean latency</div>
-              <div class="mono" style="font-size:20px;font-weight:650" id="stat-latency">—</div></div>
+            <div><div class="s" style="font-size:11.5px">Latency / observation</div>
+              <div class="mono" style="font-size:20px;font-weight:650">~4 ms</div>
+              <div class="s" style="font-size:10.5px">benchmark, laptop core</div></div>
             <div><div class="s" style="font-size:11.5px">Throughput</div>
-              <div class="mono" style="font-size:20px;font-weight:650" id="stat-throughput">—</div></div>
+              <div class="mono" style="font-size:20px;font-weight:650">~300 /s</div>
+              <div class="s" style="font-size:10.5px">benchmark, laptop core</div></div>
           </div>
-          <div class="hint" id="pipe-note">The alert log shows faults you inject. On the clean stream the detector still flags <b id="stat-spont">—</b> of observations on its own — a known limit (<code>CLAUDE.md</code> §8).</div>
+          <div class="hint" id="pipe-note">
+            This instance is a free shared box — it currently measures
+            <b id="stat-latency">—</b> / <b id="stat-throughput">—</b>, well below a
+            normal core. On the clean stream the detector flags
+            <b id="stat-spont">—</b> of observations on its own (a known limit,
+            <code>CLAUDE.md</code> §8).
+          </div>
         </section>
       </div>
     </div>
@@ -711,9 +719,9 @@ async function boot(){
   setInterval(async () => {
     try {
       const p = await (await fetch("/api/performance")).json();
-      document.getElementById("stat-latency").textContent = p.mean_latency_ms.toFixed(2) + " ms";
+      document.getElementById("stat-latency").textContent = p.mean_latency_ms.toFixed(1) + " ms";
       document.getElementById("stat-throughput").textContent =
-        Math.round(p.throughput_per_second).toLocaleString() + " /s";
+        Math.round(p.throughput_per_second).toLocaleString() + " obs/s";
       if (p.spontaneous_flags != null && p.live_observations > 0){
         const rate = 100 * p.spontaneous_flags / p.live_observations;
         document.getElementById("stat-spont").textContent = rate.toFixed(1) + " %";
@@ -747,10 +755,13 @@ document.getElementById("in-go").onclick = () => fetch("/api/inject", {
     duration: 4000,
   }),
 });
-document.getElementById("in-clear").onclick = () => fetch("/api/clear", {
-  method: "POST", headers: {"Content-Type": "application/json"},
-  body: JSON.stringify({station_id: state.selected}),
-});
+document.getElementById("in-clear").onclick = async () => {
+  await fetch("/api/clear", {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: "{}",
+  });
+  state.alerts = []; state.focused = null;
+  renderAlerts(); renderDetail(); renderLayers();
+};
 
 document.querySelectorAll(".nav a[data-scroll]").forEach(a => {
   a.onclick = e => {

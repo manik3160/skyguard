@@ -288,13 +288,17 @@ Ordered by expected value.
    (3 hours) so a stale pairwise offset cannot lock a channel out.
    Measured on the network ablation: point recall 0.555 -> 0.575, F1
    0.552 -> 0.567, **clean-stream FPR unchanged at 0.100** (the §3.7 gate),
-   single-station benchmark untouched (L4 has no peers there). Cost: root-cause
-   accuracy fell ~0.015, because more sustained-fault samples are now flagged
-   and the rule classifier is weak on exactly those -- which is item 3.
-3. **Root-cause accuracy ~0.32.** The rule-based classifier in `detect/fusion.py`
-   confuses `spike`/`offset_step` and `drift`/`noise_burst`. Compare against a
-   small gradient-boosted classifier on the evidence vector and record the result
-   in `docs/ARCHITECTURE.md` either way.
+   single-station benchmark untouched (L4 has no peers there).
+3. **Root-cause accuracy ~0.44, still the weak layer.** Was ~0.32; a targeted
+   fix took it to **0.437 single-station / 0.433 network** with zero change to
+   F1, recall or clean-stream FPR: `l2_multivariate` no longer suggests
+   `physical_violation` unless the departure is genuinely spread across
+   channels. A single sensor carrying the whole Mahalanobis distance is a spike
+   or a step, not a cross-sensor inconsistency, so it was structurally
+   mislabelling every large single-channel fault. The classifier still confuses
+   `spike`/`offset_step` and `drift`/`noise_burst`; compare against a small
+   gradient-boosted classifier on the evidence vector and record the result in
+   `docs/ARCHITECTURE.md` either way.
 4. **Network clean FPR (0.100) is worse than single-station (0.022).** Diagnose
    before adding features; something in the interleaved path is costing accuracy.
 5. **No real-data validation.** Everything is synthetic. Wire

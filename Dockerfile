@@ -6,7 +6,7 @@ FROM python:3.12-slim
 # scikit-learn / numpy wheels are self-contained; no system build tools needed.
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    SKYGUARD_SPEED=12
+    SKYGUARD_SPEED=8
 
 WORKDIR /app
 COPY pyproject.toml README.md ./

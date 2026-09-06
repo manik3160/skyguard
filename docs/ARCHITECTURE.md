@@ -75,9 +75,18 @@ Eight classes with a labelled generator would support a trained model, but rules
 are auditable, need no training data at deploy time, and a judge can read the
 reasoning.
 
-**Open:** current accuracy is ~0.32; spike/bias-step and drift/noise-burst are
-confused. A gradient-boosted classifier on the evidence vector should be tried
-and the result recorded here either way.
+Accuracy is **~0.44** (0.437 single-station, 0.433 network), up from ~0.32. The
+jump came from one rule change with zero cost to detection (F1, recall,
+clean-stream FPR all unchanged): the multivariate layer no longer emits a
+`physical_violation` suggestion unless the Mahalanobis distance is spread across
+two or more channels. A single sensor carrying the whole distance is a spike or
+a step on that sensor, not a cross-sensor inconsistency, and the old rule was
+structurally mislabelling every large single-channel fault.
+
+**Still open:** spike/bias-step and drift/noise-burst are confused. Frozen
+sensor, data dropout and the impossible-humidity case classify correctly every
+time. A gradient-boosted classifier on the evidence vector should be tried and
+the result recorded here either way.
 
 ### L2: cascade the Isolation Forest behind Mahalanobis
 

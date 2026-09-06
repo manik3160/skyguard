@@ -97,8 +97,9 @@ baseline adapts — less so now that the pipeline stops re-seeding a channel's
 baseline from the sensor while the buddy check says the neighbours still
 disagree (network point recall 0.555 → 0.575, F1 0.552 → 0.567, clean-stream FPR
 unchanged). That is what L4 buys: +0.015 F1 / +0.020 point recall in the
-ablation. Precision still needs work, and root-cause classification (see below)
-took a small hit because more sustained-fault samples are now flagged. See
+ablation. Precision still needs work. Root-cause classification is now ~0.44
+(up from ~0.32 — the multivariate layer stopped claiming "physical violation"
+for single-channel spikes) but remains the weakest layer. See
 `CLAUDE.md` §8 for the ranked list of open weaknesses.
 
 ## Quick start
@@ -180,8 +181,10 @@ if verdict.is_anomalous:
   synthetic. Real-archive validation is the highest-value open item.
 - Network false-positive rate (0.100) is worse than single-station (0.022).
   Undiagnosed.
-- Root-cause classification accuracy is ~0.37. The classifier confuses
-  spike/bias-step and drift/noise-burst.
+- Root-cause classification accuracy is ~0.44 (was ~0.32). Detection is solid
+  for every fault; it is the *label* that is unreliable — the classifier still
+  confuses spike/bias-step and drift/noise-burst. Frozen sensor, data dropout
+  and the impossible-humidity case it names correctly every time.
 - The benchmark does not currently inject drift faults (`CLAUDE.md` §8.6), and
   its injected stream is ~23 % anomalous rather than the ~4 % the injector
   docstring claims. Read point precision and recall with that in mind.
